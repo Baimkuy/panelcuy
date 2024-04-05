@@ -1,0 +1,80 @@
+version: '3.8'
+x-common:
+  database:
+    &db-environment
+    # Jangan hapus "&db-password" dari akhir baris di bawah ini, ini penting
+    # untuk fungsionalitas Panel.
+    MYSQL_PASSWORD: &db-password "baimbaim123"
+    MYSQL_ROOT_PASSWORD: "baimbaim123"
+  panel:
+    &panel-environment
+    # URL ini harus menjadi URL yang diarahkan oleh proxy balik Anda ke server panel
+    APP_URL: "https://pterodactyl.baimstore.com"
+    # Daftar zona waktu yang valid bisa ditemukan di sini: http://php.net/manual/en/timezones.php
+    APP_TIMEZONE: "UTC"
+    APP_SERVICE_AUTHOR: "noreply@example.com"
+    TRUSTED_PROXIES: "*" # Atur ini ke IP proxy Anda
+    # Hapus tanda pagar dari baris di bawah dan atur ke nilai yang tidak kosong jika Anda ingin menggunakan Let's Encrypt
+    # untuk menghasilkan sertifikat SSL untuk Panel.
+    # LE_EMAIL: ""
+  mail:
+    &mail-environment
+    MAIL_FROM: "noreply@example.com"
+    MAIL_DRIVER: "smtp"
+    MAIL_HOST: "mail"
+    MAIL_PORT: "1025"
+    MAIL_USERNAME: ""
+    MAIL_PASSWORD: ""
+    MAIL_ENCRYPTION: "true"
+ 
+#
+# ------------------------------------------------------------------------------------------
+# ZONA BAHAYA DI BAWAH
+#
+# Sisa dari file ini kemungkinan besar tidak perlu diubah. Harap hanya melakukan modifikasi
+# di bawah ini jika Anda mengerti apa yang Anda lakukan.
+#
+services:
+  database:
+    image: mariadb:10.5
+    restart: always
+    command: --default-authentication-plugin=mysql_native_password
+    volumes:
+      - "/srv/pterodactyl/database:/var/lib/mysql"
+    environment:
+      <<: *db-environment
+      MYSQL_DATABASE: "panel"
+      MYSQL_USER: "pterodactyl"
+  cache:
+    image: redis:alpine
+    restart: always
+  panel:
+    image: ghcr.io/pterodactyl/panel:latest
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    links:
+      - database
+      - cache
+    volumes:
+      - "/srv/pterodactyl/var/:/app/var/"
+      - "/srv/pterodactyl/nginx/:/etc/nginx/http.d/"
+      - "/srv/pterodactyl/certs/:/etc/letsencrypt/"
+      - "/srv/pterodactyl/logs/:/app/storage/logs"
+    environment:
+      <<: [*panel-environment, *mail-environment]
+      DB_PASSWORD: *db-password
+      APP_ENV: "production"
+      APP_ENVIRONMENT_ONLY: "false"
+      CACHE_DRIVER: "redis"
+      SESSION_DRIVER: "redis"
+      QUEUE_DRIVER: "redis"
+      REDIS_HOST: "cache"
+      DB_HOST: "database"
+      DB_PORT: "3306"
+networks:
+  default:
+    ipam:
+      config:
+￼Enter
